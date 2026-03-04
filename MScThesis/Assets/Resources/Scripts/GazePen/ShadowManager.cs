@@ -7,15 +7,18 @@ public class ShadowManager : MonoBehaviour
 
     void Start()
     {
-        // 1. Find all objects tagged "Interactable"
+        // find all objects tagged "Interactable"
         GameObject[] objects = GameObject.FindGameObjectsWithTag("Interactable");
 
         foreach (GameObject obj in objects)
         {
-            // 2. Spawn a shadow for each one
+            // Skip UI Buttons that happen to be tagged "Interactable"
+            if (obj.GetComponent<VRButton>() != null) continue;
+
+            // spawn a shadow for each one
             GameObject newShadow = Instantiate(shadowPrefab);
             
-            // 3. Setup the Shadow Script
+            //setup the shadow script
             ShadowFollower follower = newShadow.GetComponent<ShadowFollower>();
             if (follower != null)
             {

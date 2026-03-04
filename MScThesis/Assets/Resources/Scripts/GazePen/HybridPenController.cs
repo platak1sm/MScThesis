@@ -3,6 +3,7 @@ using UnityEngine;
 public class HybridPenController : MonoBehaviour
 {
     public enum IndirectMappingType { VisualAngleGain, OneToOne }
+    public enum State { Idle, DirectAir, DirectTableShadow, IndirectAir, IndirectTableShadow, IndirectTableObject }
 
     [Header("Core Systems")]
     public GazeProvider gazeProvider;
@@ -11,53 +12,69 @@ public class HybridPenController : MonoBehaviour
 
     [Header("Settings")]
     public float directGrabRadius = 0.05f; 
+    [Tooltip("How much the object moves relative to the pen")]
     public float moveSensitivity = 1.0f;   
-    public float penGazeThreshold = 20.0f; 
+    public float penGazeThreshold = 35.0f; 
     [Range(0.0f, 1.0f)]
     public float pressureThreshold = 0.15f; 
+    [Tooltip("Offset for spawning objects on the controller")]
+    public Vector3 spawnOffset = new Vector3(0, 0.05f, 0.05f);
 
     [Header("Indirect Logic")]
     public IndirectMappingType mappingType = IndirectMappingType.VisualAngleGain;
     
-    [Header("Colors")]
+    [Header("Colors & Visuals")]
     public Color hoverColor = Color.green;       
     public Color indirectGrabColor = Color.blue; 
     public Color directGrabColor = Color.yellow; 
 
-    // StateMachine
-    private enum State 
-    { 
-        Idle,
-        DirectAir,            
-        DirectTableShadow,    
-        IndirectAir,          
-        IndirectTableShadow,  
-        IndirectTableObject   
-    }
-    private State currentState = State.Idle;
-    
-    private Transform focusedTarget = null; 
-    private Transform activeObject = null;  
-    
-    // Inputs
-    private bool isPressingTable = false;
-    private bool isTriggerPressed = false;
-    private bool isLookingAtPen = false;
-    private bool wasLookingAtPen = false;
-    
-    // Movement Anchors
-    private Vector3 startPenPos;
-    private Vector3 startObjPos;
-    private Vector3 grabOffset; 
+    [Header("Top-Down 2D")]
+    public GameObject penScreen;         
+    public Camera topDownCamera;         
+    public float cameraHeight = 5.0f;    
+    [Tooltip("Lower number = more zoom.")]
+    public float cameraZoom = 1.0f;
 
-    // Visual State Tracking
-    private Transform _lastOutlinedObj;
-    private Transform _lastOutlinedShadow;
+    [HideInInspector] public State currentState = State.Idle;
+    [HideInInspector] public Transform focusedTarget = null; 
+    [HideInInspector] public Transform activeObject = null;  
+    
+    [HideInInspector] public bool isPressingTable = false;
+    [HideInInspector] public bool isTriggerPressed = false;
+    [HideInInspector] public bool isLookingAtPen = false;
+    [HideInInspector] public bool wasLookingAtPen = false;
+    
+    [HideInInspector] public Vector3 startPenPos;
+    [HideInInspector] public Vector3 startObjPos;
+    [HideInInspector] public Vector3 grabOffset; 
+
+    [HideInInspector] public Transform lastOutlinedObj;
+    [HideInInspector] public Transform lastOutlinedShadow;
+
+    // Logic handlers
+    private PenMovementHandler movementHandler;
+    private PenTargetingHandler targetingHandler;
+    private PenInteractionHandler interactionHandler;
 
     void Start()
     {
         if (gazeProvider == null) gazeProvider = FindFirstObjectByType<GazeProvider>();
         if (eyeCamera == null) eyeCamera = Camera.main;
+
+        // Cleanup pre-existing outlines
+        foreach (var obj in FindObjectsByType<Outline>(FindObjectsSortMode.None))
+        {
+            if (obj.CompareTag("Interactable") || obj.CompareTag("Shadow"))
+            {
+                obj.enabled = false;
+            }
+        }
+
+        movementHandler = new PenMovementHandler(this);
+        targetingHandler = new PenTargetingHandler(this);
+        interactionHandler = new PenInteractionHandler(this, targetingHandler);
+
+        TogglePenScreen(false);
     }
 
     void Update()
@@ -71,172 +88,102 @@ public class HybridPenController : MonoBehaviour
         isTriggerPressed = trigger > 0.5f;
         isPressingTable = pressure > pressureThreshold;
 
-        // State Handling
         if (currentState != State.Idle)
         {
             switch (currentState)
             {
                 case State.DirectAir:
-                    HandleDirectAir();
-                    if (!isTriggerPressed) EndDrag();
+                    movementHandler.HandleDirectAir();
+                    if (!isTriggerPressed) interactionHandler.EndDrag();
                     break;
 
                 case State.DirectTableShadow:
-                    HandleDirectTableShadow();
-                    if (!isPressingTable) EndDrag();
+                    movementHandler.HandleDirectTableShadow();
+                    if (!isPressingTable) interactionHandler.EndDrag();
                     break;
 
                 case State.IndirectAir:
-                    HandleIndirectAir();
-                    if (!isTriggerPressed) EndDrag();
+                    movementHandler.HandleIndirectAir();
+                    if (!isTriggerPressed) interactionHandler.EndDrag();
                     break;
 
                 case State.IndirectTableShadow:
-                    HandleIndirectTableShadow();
-                    if (!isPressingTable) EndDrag();
+                    movementHandler.HandleIndirectTableShadow();
+                    if (!isPressingTable) interactionHandler.EndDrag();
                     break;
 
                 case State.IndirectTableObject:
-                    HandleIndirectTableObject();
-                    if (!isPressingTable) EndDrag();
+                    movementHandler.HandleIndirectTableObject();
+                    if (!isPressingTable) interactionHandler.EndDrag();
                     break;
             }
         }
         else
         {
-            DeterminePotentialTarget();
+            targetingHandler.DeterminePotentialTarget();
 
-            // PRIORITY 1: TABLE (Pressure)
             if (isPressingTable && !wasPressing) 
             {
-                if (IsTouchingShadow()) StartDrag(State.DirectTableShadow);
-                else if (IsGazingAtShadow()) StartDrag(State.IndirectTableShadow);
-                else if (IsGazingAtObject()) StartDrag(State.IndirectTableObject);
+                if (!HandleToolAction(false))
+                {
+                    if (targetingHandler.IsTouchingShadow()) interactionHandler.StartDrag(State.DirectTableShadow);
+                    else if (targetingHandler.IsGazingAtShadow()) interactionHandler.StartDrag(State.IndirectTableShadow);
+                    else if (targetingHandler.IsGazingAtObject()) interactionHandler.StartDrag(State.IndirectTableObject);
+                }
             }
 
-            // PRIORITY 2: AIR (Trigger)
             if (isTriggerPressed && !wasTrigger && !isPressingTable)
             {
-                 if (IsTouchingObject()) StartDrag(State.DirectAir);
-                 else if (IsGazingAtObject()) StartDrag(State.IndirectAir);
+                if (!HandleToolAction(true))
+                {
+                     if (targetingHandler.IsTouchingObject()) interactionHandler.StartDrag(State.DirectAir);
+                     else if (targetingHandler.IsGazingAtObject()) interactionHandler.StartDrag(State.IndirectAir);
+                }
             }
         }
 
-        UpdateOutlines();
+        targetingHandler.UpdateOutlines();
     }
 
-    // Movement Logic
-
-    void HandleDirectAir()
-    {
-        if (activeObject == null) return;
-        activeObject.position = virtualPenTip.position + grabOffset;
-        activeObject.rotation = virtualPenTip.rotation;
-    }
-
-    void HandleDirectTableShadow()
-    {
-        if (activeObject == null) return;
-        Vector3 newShadowPos = virtualPenTip.position + grabOffset;
-        activeObject.position = new Vector3(newShadowPos.x, activeObject.position.y, newShadowPos.z);
-    }
-
-    void HandleIndirectAir()
-    {
-        if (activeObject == null) return;
-        Vector3 delta = GetScaledDelta();
-        activeObject.position = startObjPos + delta;
-    }
-
-    void HandleIndirectTableShadow()
-    {
-        if (activeObject == null) return;
-        Vector3 rawDelta = virtualPenTip.position - startPenPos;
-        Vector3 scaledDelta = rawDelta * moveSensitivity; 
-        Vector3 flatDelta = new Vector3(scaledDelta.x, 0, scaledDelta.z);
-        activeObject.position = startObjPos + flatDelta;
-    }
-
-    void HandleIndirectTableObject()
-    {
-        if (activeObject == null) return;
-        
-        CheckIfLookingAtPen();
-
-        if (isLookingAtPen != wasLookingAtPen)
-        {
-            ReAnchor();
-            wasLookingAtPen = isLookingAtPen;
-        }
-
-        Vector3 delta = virtualPenTip.position - startPenPos;
-        float scale = moveSensitivity;
-        if (mappingType == IndirectMappingType.VisualAngleGain) scale *= GetVisualGain();
-        Vector3 scaledDelta = delta * scale;
-
-        if (isLookingAtPen)
-        {
-            // Mode B: Z-Axis
-            Vector3 move = new Vector3(scaledDelta.x, 0, scaledDelta.z);
-            activeObject.position = startObjPos + move;
-        }
-        else
-        {
-            // Mode A: Y-Axis
-            Vector3 camRight = eyeCamera.transform.right;
-            Vector3 camUp = eyeCamera.transform.up;
-            camRight.y = 0; camRight.Normalize();
-            camUp = Vector3.up; 
-            Vector3 planeMove = (camRight * scaledDelta.x) + (camUp * scaledDelta.z);
-            activeObject.position = startObjPos + planeMove;
-        }
-    }
-
-    // helper funcs
-
-    void StartDrag(State newState)
-    {
-        currentState = newState;
-        startPenPos = virtualPenTip.position;
-        activeObject = GetLinkedObject(focusedTarget);
-        
-        if (activeObject != null)
-        {
-            startObjPos = activeObject.position;
-
-            if (newState == State.DirectTableShadow)
-            {
-                Vector3 shadowPos = new Vector3(activeObject.position.x, virtualPenTip.position.y, activeObject.position.z);
-                grabOffset = shadowPos - virtualPenTip.position;
-            }
-            else if (newState == State.DirectAir)
-            {
-                grabOffset = activeObject.position - virtualPenTip.position;
-            }
-
-            CheckIfLookingAtPen();
-            wasLookingAtPen = isLookingAtPen;
-        }
-        else
-        {
-            EndDrag();
-        }
-    }
-
-    void ReAnchor()
+    //pen helpers
+    public void ReAnchor()
     {
         startPenPos = virtualPenTip.position;
         startObjPos = activeObject.position;
     }
 
-    void EndDrag()
+    public void TogglePenScreen(bool enable)
     {
-        currentState = State.Idle;
-        activeObject = null;
-        isLookingAtPen = false;
+        if (penScreen != null) penScreen.SetActive(enable);
+        if (topDownCamera != null) topDownCamera.gameObject.SetActive(enable);
     }
 
-    Vector3 GetScaledDelta()
+    public void UpdateTopDownCamera()
+    {
+        if (topDownCamera != null && activeObject != null)
+        {
+            topDownCamera.orthographic = true; 
+            topDownCamera.orthographicSize = cameraZoom;
+
+            Vector3 trueCenter = activeObject.position; 
+            Collider objCollider = activeObject.GetComponent<Collider>();
+            
+            if (objCollider != null)
+            {
+                trueCenter = objCollider.bounds.center;
+            }
+
+            topDownCamera.transform.position = new Vector3(
+                trueCenter.x, 
+                trueCenter.y + cameraHeight, 
+                trueCenter.z
+            );
+            
+            topDownCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        }
+    }
+
+    public Vector3 GetScaledDelta()
     {
         Vector3 rawDelta = virtualPenTip.position - startPenPos;
         if (mappingType == IndirectMappingType.OneToOne) return rawDelta * moveSensitivity;
@@ -244,7 +191,7 @@ public class HybridPenController : MonoBehaviour
         return rawDelta * moveSensitivity * gain;
     }
 
-    float GetVisualGain()
+    public float GetVisualGain()
     {
         if (activeObject == null) return 1f;
         float eyeHand = Vector3.Distance(eyeCamera.transform.position, virtualPenTip.position);
@@ -252,7 +199,7 @@ public class HybridPenController : MonoBehaviour
         return eyeObj / Mathf.Max(eyeHand, 0.01f);
     }
 
-    void CheckIfLookingAtPen()
+    public void CheckIfLookingAtPen()
     {
         if (gazeProvider == null) return;
         Vector3 toPen = (virtualPenTip.position - eyeCamera.transform.position).normalized;
@@ -260,154 +207,113 @@ public class HybridPenController : MonoBehaviour
         isLookingAtPen = angle < penGazeThreshold;
     }
 
-    void DeterminePotentialTarget()
+    private bool HandleToolAction(bool fromTrigger)
     {
-        focusedTarget = null;
-        
-        Collider[] hits = Physics.OverlapSphere(virtualPenTip.position, directGrabRadius);
-        foreach (var h in hits)
+        if (InteractionToolManager.Instance == null) return false;
+
+        InteractionTool tool = InteractionToolManager.Instance.CurrentTool;
+
+        // A. UI Buttons FIRST to ensure menus can always be pressed
+        if (focusedTarget != null)
         {
-            if (h.CompareTag("Shadow") || h.CompareTag("Interactable"))
+            VRButton btn = focusedTarget.GetComponent<VRButton>();
+            if (btn != null)
             {
-                focusedTarget = h.transform;
-                return;
+                if (fromTrigger || isPressingTable) btn.Click();
+                return true; // We clicked a button, stop further tool processing
             }
         }
 
-        if (gazeProvider != null)
+        // B. Spawn Tool (No target required)
+        if (tool == InteractionTool.Spawn)
         {
-            RaycastHit[] hitsAll = Physics.SphereCastAll(
-                gazeProvider.GazeOrigin, 0.05f, gazeProvider.GazeDirection, 100f, 
-                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide
-            );
-
-            float closestDist = Mathf.Infinity;
-            Transform bestCandidate = null;
-
-            foreach (RaycastHit hit in hitsAll)
+            if (fromTrigger)
             {
-                if (hit.collider.CompareTag("Shadow") || hit.collider.CompareTag("Interactable"))
+                GameObject prefab = InteractionToolManager.Instance.PrefabToSpawn;
+                if (prefab != null)
                 {
-                    if (hit.distance < closestDist)
+                    Vector3 spawnPos = virtualPenTip.position + virtualPenTip.TransformDirection(spawnOffset);
+                    GameObject newObj = Instantiate(prefab, spawnPos, virtualPenTip.rotation);
+                    
+                    // Turn off outline if the prefab had it enabled by default
+                    var outline = newObj.GetComponent<Outline>();
+                    if (outline != null) outline.enabled = false;
+                    
+                    // Add a shadow for the new object
+                    ShadowManager sm = FindFirstObjectByType<ShadowManager>();
+                    if (sm != null && sm.shadowPrefab != null)
                     {
-                        closestDist = hit.distance;
-                        bestCandidate = hit.collider.transform;
+                        GameObject newShadow = Instantiate(sm.shadowPrefab);
+                        ShadowFollower follower = newShadow.GetComponent<ShadowFollower>();
+                        if (follower != null)
+                        {
+                            follower.targetObject = newObj.transform;
+                            follower.tableHeight = sm.globalTableHeight;
+                        }
                     }
                 }
             }
-
-            if (bestCandidate != null) focusedTarget = bestCandidate;
+            // Always block grabbing logic if Spawn tool is selected
+            return true;
         }
-    }
 
-    bool IsTouchingShadow() => focusedTarget != null && focusedTarget.CompareTag("Shadow") && IsPhysicallyClose();
-    bool IsTouchingObject() => focusedTarget != null && focusedTarget.CompareTag("Interactable") && IsPhysicallyClose();
-    bool IsPhysicallyClose() => Vector3.Distance(virtualPenTip.position, focusedTarget.position) <= directGrabRadius;
-    bool IsGazingAtShadow() => focusedTarget != null && focusedTarget.CompareTag("Shadow");
-    bool IsGazingAtObject() => focusedTarget != null && focusedTarget.CompareTag("Interactable");
-
-    Transform GetLinkedObject(Transform target)
-    {
-        if (target == null) return null;
-        if (target.CompareTag("Interactable")) return target;
-        
-        if (target.CompareTag("Shadow"))
+        // C. Target-Based Tools
+        Transform target = targetingHandler.GetLinkedObject(focusedTarget);
+        if (target != null && tool != InteractionTool.Move)
         {
-            var follower = target.GetComponent<ShadowFollower>();
-            if (follower != null) return follower.targetObject;
-        }
-        return null;
-    }
-    
-    Transform GetShadowForObject(Transform obj)
-    {
-        if (obj == null) return null;
-        ShadowFollower[] allShadows = FindObjectsByType<ShadowFollower>(FindObjectsSortMode.None);
-        foreach (var s in allShadows)
-        {
-            if (s.targetObject == obj) return s.transform;
-        }
-        return null;
-    }
-
-    // visual feedback
-    void UpdateOutlines()
-    {
-        Transform currentObj = null;
-        Transform currentShadow = null;
-        Color targetColor = Color.white;
-        bool shouldOutline = false;
-
-        // 1. Determine Desired State
-        if (currentState != State.Idle)
-        {
-            // Dragging
-            shouldOutline = true;
-            currentObj = activeObject;
-            currentShadow = GetShadowForObject(activeObject);
-
-            if (currentState == State.DirectAir || currentState == State.DirectTableShadow)
-                targetColor = directGrabColor; // Yellow
-            else
-                targetColor = indirectGrabColor; // Blue
-        }
-        else if (focusedTarget != null)
-        {
-            // Hovering
-            shouldOutline = true;
-            targetColor = hoverColor; // Green
-
-            if (focusedTarget.CompareTag("Interactable"))
+            if (fromTrigger)
             {
-                currentObj = focusedTarget;
-                currentShadow = GetShadowForObject(focusedTarget);
+                switch (tool)
+                {
+                    case InteractionTool.Delete:
+                        var outline = target.GetComponent<Outline>();
+                        if (outline != null) 
+                        {
+                            outline.enabled = false; 
+                            Destroy(outline); 
+                        }
+                        if (lastOutlinedObj == target) lastOutlinedObj = null;
+                        if (lastOutlinedShadow == target) lastOutlinedShadow = null;
+                        
+                        Destroy(target.gameObject);
+                        break;
+
+                    case InteractionTool.Duplicate:
+                        GameObject clone = Instantiate(target.gameObject, target.position, target.rotation);
+                        
+                        // Turn off outline if the cloned object had it enabled
+                        var cloneOutline = clone.GetComponent<Outline>();
+                        if (cloneOutline != null) cloneOutline.enabled = false;
+                        
+                        // Add a shadow for the clone
+                        ShadowManager sm = FindFirstObjectByType<ShadowManager>();
+                        if (sm != null && sm.shadowPrefab != null)
+                        {
+                            GameObject newShadow = Instantiate(sm.shadowPrefab);
+                            ShadowFollower follower = newShadow.GetComponent<ShadowFollower>();
+                            if (follower != null)
+                            {
+                                follower.targetObject = clone.transform;
+                                follower.tableHeight = sm.globalTableHeight;
+                            }
+                        }
+
+                        // Make the newly duplicated clone our active target and start dragging it immediately
+                        focusedTarget = clone.transform;
+                        interactionHandler.StartDrag(targetingHandler.IsPhysicallyClose() ? State.DirectAir : State.IndirectAir);
+                        break;
+
+                    case InteractionTool.ColorPicker:
+                        Renderer r = target.GetComponent<Renderer>();
+                        if (r != null) r.material.color = InteractionToolManager.Instance.ActivePaintColor;
+                        break;
+                }
             }
-            else if (focusedTarget.CompareTag("Shadow"))
-            {
-                currentShadow = focusedTarget;
-                currentObj = GetLinkedObject(focusedTarget);
-            }
+            // Block normal grab (return true) if ANY modifier tool (Delete, Duplicate, Color) is selected and aimed at an object
+            return true;
         }
 
-        // 2. Handle State Changes
-        if (_lastOutlinedObj != null && _lastOutlinedObj != currentObj)
-        {
-            SetOutline(_lastOutlinedObj, Color.white, false);
-        }
-        if (_lastOutlinedShadow != null && _lastOutlinedShadow != currentShadow)
-        {
-            SetOutline(_lastOutlinedShadow, Color.white, false);
-        }
-
-        // 3. Apply New State
-        if (shouldOutline)
-        {
-            SetOutline(currentObj, targetColor, true);
-            SetOutline(currentShadow, targetColor, true);
-        }
-
-        // 4. Update History
-        _lastOutlinedObj = currentObj;
-        _lastOutlinedShadow = currentShadow;
-    }
-
-    void SetOutline(Transform t, Color c, bool enable)
-    {
-        if (t == null) return;
-        var outline = t.GetComponent<Outline>();
-        if (outline != null)
-        {
-            if (enable)
-            {
-                outline.OutlineColor = c;
-                outline.OutlineWidth = 5f; 
-                outline.OutlineMode = Outline.Mode.OutlineAll;
-                outline.enabled = true;
-            }
-            else
-            {
-                outline.enabled = false;
-            }
-        }
+        // If move tool, or no target, let normal logic run
+        return false;
     }
 }
