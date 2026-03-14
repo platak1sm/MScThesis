@@ -16,7 +16,7 @@ public class HybridPenController : MonoBehaviour
     public float moveSensitivity = 1.0f;   
     public float penGazeThreshold = 35.0f; 
     [Range(0.0f, 1.0f)]
-    public float pressureThreshold = 0.15f; 
+    public float pressureThreshold = 0.15f;  
     [Tooltip("Offset for spawning objects on the controller")]
     public Vector3 spawnOffset = new Vector3(0, 0.05f, 0.05f);
 
@@ -34,6 +34,9 @@ public class HybridPenController : MonoBehaviour
     public float cameraHeight = 5.0f;    
     [Tooltip("Lower number = more zoom.")]
     public float cameraZoom = 1.0f;
+
+    [HideInInspector] public Vector3 initialScreenScale = Vector3.zero;
+    [HideInInspector] public float initialScreenWorldWidth = -1f;
 
     [HideInInspector] public State currentState = State.Idle;
     [HideInInspector] public Transform focusedTarget = null; 
@@ -162,15 +165,17 @@ public class HybridPenController : MonoBehaviour
     {
         if (topDownCamera != null && activeObject != null)
         {
-            topDownCamera.orthographic = true; 
-            topDownCamera.orthographicSize = cameraZoom;
+            float gain = GetVisualGain();
 
             Vector3 trueCenter = activeObject.position; 
             Collider objCollider = activeObject.GetComponent<Collider>();
+            float maxObjExtent = 0.1f;
             
             if (objCollider != null)
             {
                 trueCenter = objCollider.bounds.center;
+                // find the max width/depth of the object
+                maxObjExtent = Mathf.Max(objCollider.bounds.size.x, objCollider.bounds.size.z);
             }
 
             topDownCamera.transform.position = new Vector3(
@@ -180,6 +185,45 @@ public class HybridPenController : MonoBehaviour
             );
             
             topDownCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+
+            // Filter out shadows
+            int shadowLayer = LayerMask.NameToLayer("Shadow");
+            
+            int mask = -1; 
+            if (shadowLayer != -1) mask &= ~(1 << shadowLayer);
+            topDownCamera.cullingMask = mask;
+
+            if (penScreen != null)
+            {
+                if (initialScreenScale == Vector3.zero)
+                {
+                    initialScreenScale = penScreen.transform.localScale;
+                    RectTransform rt = penScreen.GetComponent<RectTransform>();
+                    if (rt != null) {
+                        initialScreenWorldWidth = rt.rect.width * rt.localScale.x;
+                    } else {
+                        initialScreenWorldWidth = penScreen.transform.localScale.x; 
+                    }
+                    if (initialScreenWorldWidth <= 0.001f) initialScreenWorldWidth = 0.15f;
+                }
+
+                // Physical screen size needed = Object World Size / Gain
+                float requiredPhysicalSize = maxObjExtent / gain;
+                
+                // Add padding so the screen is at least 3 times the size of the object
+                float paddedPhysicalSize = requiredPhysicalSize * 3f;
+
+                float targetWorldWidth = Mathf.Max(initialScreenWorldWidth, paddedPhysicalSize);
+                float scaleMultiplier = targetWorldWidth / initialScreenWorldWidth;
+                penScreen.transform.localScale = initialScreenScale * scaleMultiplier;
+
+                topDownCamera.orthographic = true; 
+                topDownCamera.orthographicSize = (targetWorldWidth * gain) / 2f;
+
+                penScreen.transform.position = virtualPenTip.position + new Vector3(0, 0.005f, 0); //flat on the table
+                float yAngle = eyeCamera != null ? eyeCamera.transform.eulerAngles.y : 0f;
+                penScreen.transform.rotation = Quaternion.Euler(90f, yAngle, 0f);
+            }
         }
     }
 
@@ -213,18 +257,18 @@ public class HybridPenController : MonoBehaviour
 
         InteractionTool tool = InteractionToolManager.Instance.CurrentTool;
 
-        // A. UI Buttons FIRST to ensure menus can always be pressed
+        // A. UI Buttons first to ensure menus can always be pressed
         if (focusedTarget != null)
         {
             VRButton btn = focusedTarget.GetComponent<VRButton>();
             if (btn != null)
             {
                 if (fromTrigger || isPressingTable) btn.Click();
-                return true; // We clicked a button, stop further tool processing
+                return true; 
             }
         }
 
-        // B. Spawn Tool (No target required)
+        // B. Spawn Tool 
         if (tool == InteractionTool.Spawn)
         {
             if (fromTrigger)
@@ -235,7 +279,6 @@ public class HybridPenController : MonoBehaviour
                     Vector3 spawnPos = virtualPenTip.position + virtualPenTip.TransformDirection(spawnOffset);
                     GameObject newObj = Instantiate(prefab, spawnPos, virtualPenTip.rotation);
                     
-                    // Turn off outline if the prefab had it enabled by default
                     var outline = newObj.GetComponent<Outline>();
                     if (outline != null) outline.enabled = false;
                     
@@ -253,7 +296,6 @@ public class HybridPenController : MonoBehaviour
                     }
                 }
             }
-            // Always block grabbing logic if Spawn tool is selected
             return true;
         }
 
@@ -280,11 +322,8 @@ public class HybridPenController : MonoBehaviour
 
                     case InteractionTool.Duplicate:
                         GameObject clone = Instantiate(target.gameObject, target.position, target.rotation);
-                        
-                        // Turn off outline if the cloned object had it enabled
                         var cloneOutline = clone.GetComponent<Outline>();
                         if (cloneOutline != null) cloneOutline.enabled = false;
-                        
                         // Add a shadow for the clone
                         ShadowManager sm = FindFirstObjectByType<ShadowManager>();
                         if (sm != null && sm.shadowPrefab != null)
@@ -298,7 +337,7 @@ public class HybridPenController : MonoBehaviour
                             }
                         }
 
-                        // Make the newly duplicated clone our active target and start dragging it immediately
+                        // Make the newly duplicated clone the active target and start dragging it immediately
                         focusedTarget = clone.transform;
                         interactionHandler.StartDrag(targetingHandler.IsPhysicallyClose() ? State.DirectAir : State.IndirectAir);
                         break;
@@ -309,11 +348,9 @@ public class HybridPenController : MonoBehaviour
                         break;
                 }
             }
-            // Block normal grab (return true) if ANY modifier tool (Delete, Duplicate, Color) is selected and aimed at an object
             return true;
         }
 
-        // If move tool, or no target, let normal logic run
         return false;
     }
 }

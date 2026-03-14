@@ -14,13 +14,25 @@ public class PenTargetingHandler
         pen.focusedTarget = null;
         
         Collider[] hits = Physics.OverlapSphere(pen.virtualPenTip.position, pen.directGrabRadius);
+        Transform fallbackInteractable = null;
+
         foreach (var h in hits)
         {
-            if (h.CompareTag("Shadow") || h.CompareTag("Interactable"))
+            if (h.CompareTag("Shadow"))
             {
                 pen.focusedTarget = h.transform;
                 return;
             }
+            else if (h.CompareTag("Interactable") && fallbackInteractable == null)
+            {
+                fallbackInteractable = h.transform;
+            }
+        }
+
+        if (fallbackInteractable != null)
+        {
+            pen.focusedTarget = fallbackInteractable;
+            return;
         }
 
         if (pen.gazeProvider != null)
@@ -30,22 +42,40 @@ public class PenTargetingHandler
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide
             );
 
-            float closestDist = Mathf.Infinity;
-            Transform bestCandidate = null;
+            float closestInteractableDist = Mathf.Infinity;
+            Transform bestInteractable = null;
+
+            float closestShadowDist = Mathf.Infinity;
+            Transform bestShadow = null;
 
             foreach (RaycastHit hit in hitsAll)
             {
-                if (hit.collider.CompareTag("Shadow") || hit.collider.CompareTag("Interactable"))
+                if (hit.collider.CompareTag("Interactable"))
                 {
-                    if (hit.distance < closestDist)
+                    if (hit.distance < closestInteractableDist)
                     {
-                        closestDist = hit.distance;
-                        bestCandidate = hit.collider.transform;
+                        closestInteractableDist = hit.distance;
+                        bestInteractable = hit.collider.transform;
+                    }
+                }
+                else if (hit.collider.CompareTag("Shadow"))
+                {
+                    if (hit.distance < closestShadowDist)
+                    {
+                        closestShadowDist = hit.distance;
+                        bestShadow = hit.collider.transform;
                     }
                 }
             }
 
-            if (bestCandidate != null) pen.focusedTarget = bestCandidate;
+            if (bestInteractable != null)
+            {
+                pen.focusedTarget = bestInteractable;
+            }
+            else if (bestShadow != null)
+            {
+                pen.focusedTarget = bestShadow;
+            }
         }
     }
 

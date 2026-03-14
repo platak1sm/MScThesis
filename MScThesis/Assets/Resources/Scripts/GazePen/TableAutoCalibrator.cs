@@ -41,6 +41,13 @@ public class TableAutoCalibrator : MonoBehaviour
             obj.transform.position += new Vector3(0, delta, 0);
         }
 
+        // move calibration objects
+        GameObject[] calibrations = GameObject.FindGameObjectsWithTag("Calibration");
+        foreach (GameObject obj in calibrations)
+        {
+            obj.transform.position += new Vector3(0, delta, 0);
+        }
+
         // update shadows
         ShadowFollower[] shadows = FindObjectsByType<ShadowFollower>(FindObjectsSortMode.None);
         foreach (ShadowFollower shadow in shadows)
@@ -60,7 +67,7 @@ public class TableAutoCalibrator : MonoBehaviour
         Invoke("StopVibration", 0.2f);
         lastCalibrateTime = Time.time;
         
-        Debug.Log("Calibrated " + interactables.Length + " objects to height: " + newHeight);
+        Debug.Log("Calibrated " + (interactables.Length + calibrations.Length) + " objects to height: " + newHeight);
     }
 
     void StopVibration()
