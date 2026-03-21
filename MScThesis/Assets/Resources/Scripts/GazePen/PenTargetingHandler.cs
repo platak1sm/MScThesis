@@ -14,24 +14,48 @@ public class PenTargetingHandler
         pen.focusedTarget = null;
         
         Collider[] hits = Physics.OverlapSphere(pen.virtualPenTip.position, pen.directGrabRadius);
-        Transform fallbackInteractable = null;
+        Transform bestOverlapShadow = null;
+        Transform bestOverlapInteractable = null;
 
         foreach (var h in hits)
         {
-            if (h.CompareTag("Shadow"))
+            if (h.CompareTag("Interactable") && bestOverlapInteractable == null)
             {
-                pen.focusedTarget = h.transform;
-                return;
+                bestOverlapInteractable = h.transform;
             }
-            else if (h.CompareTag("Interactable") && fallbackInteractable == null)
+            else if (h.CompareTag("Shadow") && bestOverlapShadow == null)
             {
-                fallbackInteractable = h.transform;
+                bestOverlapShadow = h.transform;
             }
         }
 
-        if (fallbackInteractable != null)
+        // If the pen is touching both the BoxCollider and the Shadow at the exact same time
+        if (bestOverlapInteractable != null && bestOverlapShadow != null)
         {
-            pen.focusedTarget = fallbackInteractable;
+            if (pen.isPressingTable)
+            {
+                // The pen is being pressed down into the desk.
+                // Prioritize the shadow so DirectTableShadow drag is triggered.
+                pen.focusedTarget = bestOverlapShadow;
+            }
+            else
+            {
+                // The pen is not being pressed down into the desk
+                // Prioritize the physical box collider
+                pen.focusedTarget = bestOverlapInteractable;
+            }
+            return;
+        }
+
+        // If they are only touching one or the other, cleanly grab mathematically whichever one they are touching
+        if (bestOverlapInteractable != null)
+        {
+            pen.focusedTarget = bestOverlapInteractable;
+            return;
+        }
+        if (bestOverlapShadow != null)
+        {
+            pen.focusedTarget = bestOverlapShadow;
             return;
         }
 

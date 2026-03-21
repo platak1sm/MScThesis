@@ -49,7 +49,6 @@ public class PenMovementHandler
         {
             pen.ReAnchor();
             pen.wasLookingAtPen = pen.isLookingAtPen;
-            pen.TogglePenScreen(pen.isLookingAtPen);
         }
 
         Vector3 delta = pen.virtualPenTip.position - pen.startPenPos;
@@ -63,18 +62,47 @@ public class PenMovementHandler
 
         if (pen.isLookingAtPen)
         {
-            Vector3 move = new Vector3(scaledDelta.x, 0, scaledDelta.z);
+            Vector3 move;
+            if (pen.lockedPosture == HybridPenController.HeadPosture.Straight)
+            {
+                move = new Vector3(scaledDelta.x, 0, scaledDelta.z);
+            }
+            else // HeadPosture.Down
+            {
+                if (pen.minimapDownMode == HybridPenController.MinimapDownMode.FrontFacing_XY)
+                {
+                    move = new Vector3(scaledDelta.x, scaledDelta.z, 0); // Front-Facing Minimap (XY)
+                }
+                else // SideFacing_YZ
+                {
+                    move = new Vector3(0, scaledDelta.z, scaledDelta.x); // Side-Facing Minimap (YZ)
+                }
+            }
             pen.activeObject.position = pen.startObjPos + move;
-            pen.UpdateTopDownCamera();
         }
         else
         {
             Vector3 camRight = pen.eyeCamera.transform.right;
-            Vector3 camUp = pen.eyeCamera.transform.up;
-            camRight.y = 0; camRight.Normalize();
-            camUp = Vector3.up; 
-            Vector3 planeMove = (camRight * scaledDelta.x) + (camUp * scaledDelta.z);
+            camRight.y = 0; 
+            if (camRight.sqrMagnitude > 0.001f) camRight.Normalize(); else camRight = Vector3.right;
+            
+            Vector3 planeMove;
+            if (pen.lockedPosture == HybridPenController.HeadPosture.Straight)
+            {
+                Vector3 camUp = Vector3.up; 
+                planeMove = (camRight * scaledDelta.x) + (camUp * scaledDelta.z); // Wall mapping (XY)
+            }
+            else // HeadPosture.Down
+            {
+                Vector3 camForward = pen.eyeCamera.transform.forward;
+                camForward.y = 0;
+                if (camForward.sqrMagnitude > 0.001f) camForward.Normalize(); else camForward = Vector3.forward;
+                planeMove = (camRight * scaledDelta.x) + (camForward * scaledDelta.z); // Floor mapping (XZ)
+            }
+            
             pen.activeObject.position = pen.startObjPos + planeMove;
         }
+
+        pen.UpdateMinimapCamera();
     }
 }

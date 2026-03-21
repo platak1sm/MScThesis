@@ -2,9 +2,9 @@ using UnityEngine;
 
 public class HandMenuController : MonoBehaviour
 {
-    [SerializeField] private Transform leftControllerAnchor; // Assign LeftControllerAnchor here for controller positioning
-    [SerializeField] private GameObject menuCanvas; // Drag your World Space Canvas
-    [SerializeField] private Vector3 offset = new Vector3(0, 0.15f, 0.05f); // Offset above palm/controller
+    [SerializeField] private Transform leftControllerAnchor; 
+    [SerializeField] private GameObject menuCanvas;
+    [SerializeField] private Vector3 offset = new Vector3(0, 0.15f, 0.05f); 
 
     private bool isMenuVisible = false;
 

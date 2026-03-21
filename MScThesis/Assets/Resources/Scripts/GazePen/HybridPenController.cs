@@ -3,6 +3,8 @@ using UnityEngine;
 public class HybridPenController : MonoBehaviour
 {
     public enum IndirectMappingType { VisualAngleGain, OneToOne }
+    public enum HeadPosture { Straight, Down }
+    public enum MinimapDownMode { FrontFacing_XY, SideFacing_YZ }
     public enum State { Idle, DirectAir, DirectTableShadow, IndirectAir, IndirectTableShadow, IndirectTableObject }
 
     [Header("Core Systems")]
@@ -23,17 +25,31 @@ public class HybridPenController : MonoBehaviour
     [Header("Indirect Logic")]
     public IndirectMappingType mappingType = IndirectMappingType.VisualAngleGain;
     
+    [Header("Perspective-Dependent Interaction")]
+    public float postureDownThreshold = 25.0f;
+    public float postureStraightThreshold = 15.0f;
+    public MinimapDownMode minimapDownMode = MinimapDownMode.FrontFacing_XY;
+    public enum MinimapScaleMode { TrueOptical1To1 }
+    [Tooltip("TrueOptical mathematically matches your eye ray scale.")]
+    public MinimapScaleMode minimapScaleMode = MinimapScaleMode.TrueOptical1To1;
+    [HideInInspector] public HeadPosture currentPosture = HeadPosture.Straight;
+    [HideInInspector] public HeadPosture lockedPosture = HeadPosture.Straight;
+
     [Header("Colors & Visuals")]
     public Color hoverColor = Color.green;       
     public Color indirectGrabColor = Color.blue; 
     public Color directGrabColor = Color.yellow; 
 
-    [Header("Top-Down 2D")]
+    [Header("Minimap 2D Camera")]
     public GameObject penScreen;         
-    public Camera topDownCamera;         
+    public Camera minimapCamera;         
     public float cameraHeight = 5.0f;    
     [Tooltip("Lower number = more zoom.")]
     public float cameraZoom = 1.0f;
+    [Tooltip("Speed at which the minimap expands/shrinks.")]
+    public float minimapAnimationSpeed = 5f;
+    [Tooltip("Size multiplier when not looking at the pen.")]
+    public float minimapMinimizedScale = 0.2f;
 
     [HideInInspector] public Vector3 initialScreenScale = Vector3.zero;
     [HideInInspector] public float initialScreenWorldWidth = -1f;
@@ -85,6 +101,22 @@ public class HybridPenController : MonoBehaviour
         float pressure = OVRInput.Get(OVRInput.Axis1D.PrimaryStylusForce, OVRInput.Controller.RTouch);
         float trigger = OVRInput.Get(OVRInput.Axis1D.PrimaryIndexTrigger, OVRInput.Controller.RTouch);
         
+        CheckIfLookingAtPen();
+
+        float pitch = 0f;
+        if (gazeProvider != null && gazeProvider.GazeDirection.sqrMagnitude > 0.001f)
+        {
+            pitch = Quaternion.LookRotation(gazeProvider.GazeDirection).eulerAngles.x;
+        }
+        else
+        {
+            pitch = eyeCamera.transform.localEulerAngles.x;
+        }
+        if (pitch > 180f) pitch -= 360f;
+        
+        if (pitch > postureDownThreshold) currentPosture = HeadPosture.Down;
+        else if (pitch < postureStraightThreshold) currentPosture = HeadPosture.Straight;
+
         bool wasTrigger = isTriggerPressed;
         bool wasPressing = isPressingTable;
         
@@ -157,13 +189,33 @@ public class HybridPenController : MonoBehaviour
 
     public void TogglePenScreen(bool enable)
     {
-        if (penScreen != null) penScreen.SetActive(enable);
-        if (topDownCamera != null) topDownCamera.gameObject.SetActive(enable);
+        if (penScreen != null)
+        {
+            if (enable && !penScreen.activeSelf)
+            {
+                // Store the prefab scale before manipulating it
+                if (initialScreenScale == Vector3.zero)
+                {
+                    initialScreenScale = penScreen.transform.localScale;
+                    RectTransform rt = penScreen.GetComponent<RectTransform>();
+                    if (rt != null) {
+                        initialScreenWorldWidth = rt.rect.width * rt.localScale.x;
+                    } else {
+                        initialScreenWorldWidth = penScreen.transform.localScale.x; 
+                    }
+                    if (initialScreenWorldWidth <= 0.001f) initialScreenWorldWidth = 0.15f;
+                }
+
+                penScreen.transform.localScale = initialScreenScale * minimapMinimizedScale;
+            }
+            penScreen.SetActive(enable);
+        }
+        if (minimapCamera != null) minimapCamera.gameObject.SetActive(enable);
     }
 
-    public void UpdateTopDownCamera()
+    public void UpdateMinimapCamera()
     {
-        if (topDownCamera != null && activeObject != null)
+        if (minimapCamera != null && activeObject != null)
         {
             float gain = GetVisualGain();
 
@@ -174,24 +226,38 @@ public class HybridPenController : MonoBehaviour
             if (objCollider != null)
             {
                 trueCenter = objCollider.bounds.center;
-                // find the max width/depth of the object
+                // find the max width/depth
                 maxObjExtent = Mathf.Max(objCollider.bounds.size.x, objCollider.bounds.size.z);
             }
 
-            topDownCamera.transform.position = new Vector3(
-                trueCenter.x, 
-                trueCenter.y + cameraHeight, 
-                trueCenter.z
-            );
-            
-            topDownCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            // attach to the game object center
+            minimapCamera.transform.position = trueCenter;
+
+            // to prevent occlusion: Near Clip = the physical edge of the object (plus tiny 1cm buffer)
+            minimapCamera.nearClipPlane = -(maxObjExtent / 2f) - 0.01f;
+
+            if (lockedPosture == HeadPosture.Straight)
+            {
+                minimapCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            }
+            else // HeadPosture.Down
+            {
+                if (minimapDownMode == MinimapDownMode.FrontFacing_XY)
+                {
+                    minimapCamera.transform.rotation = Quaternion.Euler(0f, 0f, 0f); // Looks at +Z
+                }
+                else // SideFacing_YZ
+                {
+                    minimapCamera.transform.rotation = Quaternion.Euler(0f, -90f, 0f); // Looks at -X
+                }
+            }
 
             // Filter out shadows
             int shadowLayer = LayerMask.NameToLayer("Shadow");
             
             int mask = -1; 
             if (shadowLayer != -1) mask &= ~(1 << shadowLayer);
-            topDownCamera.cullingMask = mask;
+            minimapCamera.cullingMask = mask;
 
             if (penScreen != null)
             {
@@ -207,18 +273,47 @@ public class HybridPenController : MonoBehaviour
                     if (initialScreenWorldWidth <= 0.001f) initialScreenWorldWidth = 0.15f;
                 }
 
-                // Physical screen size needed = Object World Size / Gain
-                float requiredPhysicalSize = maxObjExtent / gain;
-                
-                // Add padding so the screen is at least 3 times the size of the object
-                float paddedPhysicalSize = requiredPhysicalSize * 3f;
+                float targetWorldWidth;
+                float targetOrthoSize;
 
-                float targetWorldWidth = Mathf.Max(initialScreenWorldWidth, paddedPhysicalSize);
+                if (minimapScaleMode == MinimapScaleMode.TrueOptical1To1)
+                {
+                    // True 1:1 Optical Ray Scaling
+                    float requiredPhysicalSize = maxObjExtent / gain;
+                    float paddedPhysicalSize = requiredPhysicalSize * 3f;
+
+                    // Ensure the physical tablet UI does not scale down into a microscopic sub-pixel point
+                    targetWorldWidth = Mathf.Max(initialScreenWorldWidth, paddedPhysicalSize);
+                    
+                    targetOrthoSize = ((paddedPhysicalSize * gain) / 2f) / Mathf.Max(0.01f, cameraZoom);
+                }
+
                 float scaleMultiplier = targetWorldWidth / initialScreenWorldWidth;
-                penScreen.transform.localScale = initialScreenScale * scaleMultiplier;
+                Vector3 expandedScale = initialScreenScale * scaleMultiplier;
+                Vector3 targetScale = expandedScale;
 
-                topDownCamera.orthographic = true; 
-                topDownCamera.orthographicSize = (targetWorldWidth * gain) / 2f;
+                // If not looking at the pen, shrink the minimap
+                if (!isLookingAtPen)
+                {
+                    targetScale = initialScreenScale * minimapMinimizedScale;
+                    targetOrthoSize = targetOrthoSize * (targetScale.x / Mathf.Max(0.001f, expandedScale.x));
+                }
+
+                // Animate physical tablet scale smoothly
+                penScreen.transform.localScale = Vector3.Lerp(
+                    penScreen.transform.localScale, 
+                    targetScale, 
+                    Time.deltaTime * minimapAnimationSpeed
+                );
+
+                minimapCamera.orthographic = true; 
+                
+                // Animate orthographic size smoothly
+                minimapCamera.orthographicSize = Mathf.Lerp(
+                    minimapCamera.orthographicSize, 
+                    targetOrthoSize, 
+                    Time.deltaTime * minimapAnimationSpeed
+                );
 
                 penScreen.transform.position = virtualPenTip.position + new Vector3(0, 0.005f, 0); //flat on the table
                 float yAngle = eyeCamera != null ? eyeCamera.transform.eulerAngles.y : 0f;

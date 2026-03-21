@@ -19,6 +19,8 @@ public class PenInteractionHandler
         
         if (pen.activeObject != null)
         {
+            pen.lockedPosture = pen.currentPosture;
+
             pen.startObjPos = pen.activeObject.position;
 
             if (newState == HybridPenController.State.DirectTableShadow)
@@ -34,10 +36,10 @@ public class PenInteractionHandler
             pen.CheckIfLookingAtPen();
             pen.wasLookingAtPen = pen.isLookingAtPen;
             
-            if (newState == HybridPenController.State.IndirectTableObject && pen.isLookingAtPen)
+            if (newState == HybridPenController.State.IndirectTableObject || newState == HybridPenController.State.IndirectTableShadow)
             {
                 pen.TogglePenScreen(true);
-                pen.UpdateTopDownCamera();
+                pen.UpdateMinimapCamera();
             }
         }
         else
