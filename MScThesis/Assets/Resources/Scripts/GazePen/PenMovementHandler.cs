@@ -13,7 +13,9 @@ public class PenMovementHandler
     {
         if (pen.activeObject == null) return;
         pen.activeObject.position = pen.virtualPenTip.position + pen.grabOffset;
-        pen.activeObject.rotation = pen.virtualPenTip.rotation;
+        
+        // Add the pen's current rotation to the originally captured angle difference!
+        pen.activeObject.rotation = pen.virtualPenTip.rotation * pen.grabRotationOffset;
     }
 
     public void HandleDirectTableShadow()

@@ -31,6 +31,7 @@ public class PenInteractionHandler
             else if (newState == HybridPenController.State.DirectAir)
             {
                 pen.grabOffset = pen.activeObject.position - pen.virtualPenTip.position;
+                pen.grabRotationOffset = Quaternion.Inverse(pen.virtualPenTip.rotation) * pen.activeObject.rotation;
             }
 
             pen.CheckIfLookingAtPen();

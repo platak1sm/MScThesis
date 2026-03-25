@@ -66,6 +66,7 @@ public class HybridPenController : MonoBehaviour
     [HideInInspector] public Vector3 startPenPos;
     [HideInInspector] public Vector3 startObjPos;
     [HideInInspector] public Vector3 grabOffset; 
+    [HideInInspector] public Quaternion grabRotationOffset;
 
     [HideInInspector] public Transform lastOutlinedObj;
     [HideInInspector] public Transform lastOutlinedShadow;
@@ -178,6 +179,7 @@ public class HybridPenController : MonoBehaviour
         }
 
         targetingHandler.UpdateOutlines();
+        UpdateMinimapCamera();
     }
 
     //pen helpers
@@ -215,19 +217,44 @@ public class HybridPenController : MonoBehaviour
 
     public void UpdateMinimapCamera()
     {
+        if (penScreen != null)
+        {
+            penScreen.transform.position = virtualPenTip.position + new Vector3(0, 0.005f, 0); //flat on the table
+            float yAngle = eyeCamera != null ? eyeCamera.transform.eulerAngles.y : 0f;
+            penScreen.transform.rotation = Quaternion.Euler(90f, yAngle, 0f);
+
+            if (initialScreenScale == Vector3.zero)
+            {
+                initialScreenScale = penScreen.transform.localScale;
+                RectTransform rt = penScreen.GetComponent<RectTransform>();
+                if (rt != null) {
+                    initialScreenWorldWidth = rt.rect.width * rt.localScale.x;
+                } else {
+                    initialScreenWorldWidth = penScreen.transform.localScale.x; 
+                }
+                if (initialScreenWorldWidth <= 0.001f) initialScreenWorldWidth = 0.15f;
+            }
+        }
+
         if (minimapCamera != null && activeObject != null)
         {
             float gain = GetVisualGain();
 
-            Vector3 trueCenter = activeObject.position; 
-            Collider objCollider = activeObject.GetComponent<Collider>();
+            Vector3 trueCenter = activeObject.position;
             float maxObjExtent = 0.1f;
             
-            if (objCollider != null)
+            Collider[] colliders = activeObject.GetComponentsInChildren<Collider>();
+            if (colliders.Length > 0)
             {
-                trueCenter = objCollider.bounds.center;
-                // find the max width/depth
-                maxObjExtent = Mathf.Max(objCollider.bounds.size.x, objCollider.bounds.size.z);
+                Bounds combinedBounds = colliders[0].bounds;
+                for (int i = 1; i < colliders.Length; i++)
+                {
+                    if (!colliders[i].isTrigger) combinedBounds.Encapsulate(colliders[i].bounds);
+                }
+                
+                trueCenter = combinedBounds.center;
+                // find the max width/depth of the combined multi-part prefab
+                maxObjExtent = Mathf.Max(combinedBounds.size.x, combinedBounds.size.z);
             }
 
             // attach to the game object center
@@ -261,20 +288,8 @@ public class HybridPenController : MonoBehaviour
 
             if (penScreen != null)
             {
-                if (initialScreenScale == Vector3.zero)
-                {
-                    initialScreenScale = penScreen.transform.localScale;
-                    RectTransform rt = penScreen.GetComponent<RectTransform>();
-                    if (rt != null) {
-                        initialScreenWorldWidth = rt.rect.width * rt.localScale.x;
-                    } else {
-                        initialScreenWorldWidth = penScreen.transform.localScale.x; 
-                    }
-                    if (initialScreenWorldWidth <= 0.001f) initialScreenWorldWidth = 0.15f;
-                }
-
-                float targetWorldWidth;
-                float targetOrthoSize;
+                float targetWorldWidth = initialScreenWorldWidth;
+                float targetOrthoSize = 1.0f;
 
                 if (minimapScaleMode == MinimapScaleMode.TrueOptical1To1)
                 {
@@ -314,10 +329,18 @@ public class HybridPenController : MonoBehaviour
                     targetOrthoSize, 
                     Time.deltaTime * minimapAnimationSpeed
                 );
-
-                penScreen.transform.position = virtualPenTip.position + new Vector3(0, 0.005f, 0); //flat on the table
-                float yAngle = eyeCamera != null ? eyeCamera.transform.eulerAngles.y : 0f;
-                penScreen.transform.rotation = Quaternion.Euler(90f, yAngle, 0f);
+            }
+        }
+        else if (penScreen != null && activeObject == null)
+        {
+            if (initialScreenScale != Vector3.zero)
+            {
+                Vector3 minimizedScale = initialScreenScale * minimapMinimizedScale;
+                penScreen.transform.localScale = Vector3.Lerp(
+                    penScreen.transform.localScale, 
+                    minimizedScale, 
+                    Time.deltaTime * minimapAnimationSpeed
+                );
             }
         }
     }
