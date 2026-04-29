@@ -4,7 +4,7 @@
 **Supervisor:** Ken Pfeuffer  
 **Context:** Master Thesis (30 ECTS)  
 
---- ### [Demo](https://youtu.be/bcVJdNiHlLo)
+--- [Demo](https://youtu.be/bcVJdNiHlLo)
 
 This repository contains the implementation of a Master Thesis project exploring **Hybrid Surface-Air Interaction**. The project aims to bridge the gap between 2D surface precision and 3D spatial freedom using the Meta Quest Pro.
 
