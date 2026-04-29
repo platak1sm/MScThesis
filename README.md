@@ -47,7 +47,7 @@ This modality introduces several advanced contextual sub-systems:
         * 👇 *Modifier (Glance at Pen):* Looking down at the physical hand toggles the routing to the **Y-axis** (Vertical).
 * **Wrist Rotation:** Physically twisting the stylus on the table extracts a delta-twist applied exclusively to the virtual object's Y-axis rotation.
 * **Spatial Awareness (Smart Pen Minimap):** When the system detects the user shifting into Z-Axis (Depth) mode by looking down at the pen, a virtual smartwatch-style screen automatically activates on the controller. This provides a live, top-down 2D orthographic minimap of the target object to assist with depth placement.
-* **Intent Communication:** A strict visual feedback system communicates system state via object/shadow outlines: Hovering (Green), Indirect Trackpad Manipulation (Blue), and Direct Physical Manipulation (Yellow).
+* **Intent Communication:** A strict visual feedback system communicates system state via object/shadow outlines: Hovering (Yellow), Manipulation (Green).
 
 ---
 
