@@ -1,0 +1,70 @@
+using UnityEngine;
+
+public class TableAutoCalibrator : MonoBehaviour
+{
+    [Header("References")]
+    public Transform tablePlane;       
+    public Transform virtualPenTip;    
+    
+    [Header("Settings")]
+    public float requiredPressure = 0.5f; 
+    public float cooldownTime = 1.0f;     
+    
+    private float lastCalibrateTime = 0;
+
+    void Update()
+    {
+        // A Button + Pressure
+        bool isHoldingA = OVRInput.Get(OVRInput.Button.One, OVRInput.Controller.RTouch);
+        float currentPressure = OVRInput.Get(OVRInput.Axis1D.PrimaryStylusForce, OVRInput.Controller.RTouch);
+
+        if (isHoldingA && currentPressure > requiredPressure && Time.time > lastCalibrateTime + cooldownTime)
+        {
+            Calibrate();
+        }
+    }
+
+    void Calibrate()
+    {
+        float newHeight = virtualPenTip.position.y;
+        float oldHeight = tablePlane.position.y;
+        float delta = newHeight - oldHeight;
+
+        // move table
+        Vector3 tablePos = tablePlane.position;
+        tablePlane.position = new Vector3(tablePos.x, newHeight, tablePos.z);
+
+        // move calibration objects
+        GameObject[] calibrations = GameObject.FindGameObjectsWithTag("Calibration");
+        foreach (GameObject obj in calibrations)
+        {
+            obj.transform.position += new Vector3(0, delta, 0);
+        }
+
+        // update shadows
+        ShadowFollower[] shadows = FindObjectsByType<ShadowFollower>(FindObjectsSortMode.None);
+        foreach (ShadowFollower shadow in shadows)
+        {
+            shadow.tableHeight = newHeight;
+        }
+        
+        // update scene manager (for future spawns)
+        ShadowManager manager = FindFirstObjectByType<ShadowManager>();
+        if (manager != null)
+        {
+            manager.globalTableHeight = newHeight + 0.001f;
+        }
+
+        // feedback
+        OVRInput.SetControllerVibration(1, 1, OVRInput.Controller.RTouch);
+        Invoke("StopVibration", 0.2f);
+        lastCalibrateTime = Time.time;
+        
+        Debug.Log("Calibrated " + (calibrations.Length) + " objects to height: " + newHeight);
+    }
+
+    void StopVibration()
+    {
+        OVRInput.SetControllerVibration(0, 0, OVRInput.Controller.RTouch);
+    }
+}

@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 0
+    path: Assets/Scenes/3DUI Middle Pinch Demo.unity
+    guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 0
+    path: Assets/Scenes/3DUI Index Pinch Only.unity
+    guid: 33f976b3db94a4a878e01b552522dff7
+  - enabled: 0
+    path: Assets/Scenes/3DUI Two-Hand Demo.unity
+    guid: c900d63248f60499aabdd8d613d640bf
+  - enabled: 0
+    path: Assets/Scenes/3DUI 1Step Demo.unity
+    guid: 19f0415b2f64e485c9010731d5d9c20e
+  - enabled: 0
+    path: Assets/Scenes/3DUI 2StepMiddlePinchDemo.unity
+    guid: fc199cf1900504092a252f8e361f4723
+  - enabled: 0
+    path: Assets/Scenes/Practice1.unity
+    guid: b213804bec6624367ad73d26d7a5c06e
+  - enabled: 0
+    path: Assets/Scenes/Technique1.unity
+    guid: aeb19f5db06344e30bd8e2c342a38614
+  - enabled: 0
+    path: Assets/Scenes/Practice2.unity
+    guid: 138cb4174405149f1882e3fc71d4a61a
+  - enabled: 0
+    path: Assets/Scenes/Technique2.unity
+    guid: 393de321cf6e44be9964a60fb965e1d0
+  - enabled: 0
+    path: Assets/Scenes/Practice3.unity
+    guid: 70120f639bbaf42b783dcf5e77814d2b
+  - enabled: 0
+    path: Assets/Scenes/Technique3.unity
+    guid: 3cdf607bb020e4c87abe66c6f57099b4
+  - enabled: 0
+    path: Assets/Scenes/CarAssembly.unity
+    guid: e7f57e68745c64ea3a0f47320917494a
+  - enabled: 0
+    path: Assets/Scenes/3DModeling.unity
+    guid: f00210c7ceedd40f098d14ca31493026
+  - enabled: 0
+    path: Assets/Scenes/InteriorDesign.unity
+    guid: 3d64699d3e57d4869bb0803585c065e2
+  - enabled: 0
+    path: Assets/Scenes/Abstract.unity
+    guid: 21df5c6a9f7dc4de0a2ce0333dd36157
+  - enabled: 0
+    path: Assets/Scenes/Interior.unity
+    guid: aa2056cda90204a07a1890bfc7d730e6
+  - enabled: 0
+    path: Assets/Scenes/GazePen.unity
+    guid: 2b25432c874584127864aad1e4f5ebbc
+  - enabled: 1
+    path: Assets/Scenes/GazePen 1.unity
+    guid: c3c4f6f23cc074734b6a33d13d2e1bf1
+  m_configObjects:
+    Unity.XR.Oculus.Settings: {fileID: 11400000, guid: 00beb230c8e074f719afbc91211a5ff9, type: 2}
+    com.unity.input.settings: {fileID: 11400000, guid: 38ba31f84ae6f49c3931e46bf53b4a9f, type: 2}
+    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: c331dfab10ed244fdaa062d218a802bf, type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 40709237a4082467f9cbf8189a78d493, type: 2}
+  m_UseUCBPForAssetBundles: 0
