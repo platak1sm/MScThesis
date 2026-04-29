@@ -9,6 +9,7 @@ TagManager:
   - Handle
   - Table
   - Shadow
+  - Calibration
   layers:
   - Default
   - TransparentFX
@@ -20,7 +21,7 @@ TagManager:
   - 
   - Bounds
   - IgnoreForPointer
-  - 
+  - Shadow
   - 
   - 
   - 

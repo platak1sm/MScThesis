@@ -53,9 +53,12 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Interior.unity
     guid: aa2056cda90204a07a1890bfc7d730e6
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/GazePen.unity
     guid: 2b25432c874584127864aad1e4f5ebbc
+  - enabled: 1
+    path: Assets/Scenes/GazePen 1.unity
+    guid: c3c4f6f23cc074734b6a33d13d2e1bf1
   m_configObjects:
     Unity.XR.Oculus.Settings: {fileID: 11400000, guid: 00beb230c8e074f719afbc91211a5ff9, type: 2}
     com.unity.input.settings: {fileID: 11400000, guid: 38ba31f84ae6f49c3931e46bf53b4a9f, type: 2}

@@ -67,6 +67,15 @@ public class HybridPenController : MonoBehaviour
     [HideInInspector] public Vector3 startObjPos;
     [HideInInspector] public Vector3 grabOffset; 
     [HideInInspector] public Quaternion grabRotationOffset;
+    
+    [Tooltip("How much the object rotates when twisting the pen on the table")]
+    public float indirectRotationMultiplier = 3.0f;
+    
+    [Tooltip("Custom multiplier to slightly boost table-based hand tracking speed")]
+    public float tableIndirectGainMultiplier = 1.30f;
+    
+    [HideInInspector] public float startPenRotationY;
+    [HideInInspector] public float startObjRotationY;
 
     [HideInInspector] public Transform lastOutlinedObj;
     [HideInInspector] public Transform lastOutlinedShadow;
@@ -394,14 +403,19 @@ public class HybridPenController : MonoBehaviour
                 GameObject prefab = InteractionToolManager.Instance.PrefabToSpawn;
                 if (prefab != null)
                 {
-                    Vector3 spawnPos = virtualPenTip.position + virtualPenTip.TransformDirection(spawnOffset);
-                    GameObject newObj = Instantiate(prefab, spawnPos, virtualPenTip.rotation);
+                    ShadowManager sm = FindFirstObjectByType<ShadowManager>();
+                    float floorY = sm != null ? sm.globalTableHeight : 0f;
+                    
+                    // Force the spawn location perfectly flat down against the theoretical desk, 2cm above the surface. 
+                    Vector3 flatSpawnPos = new Vector3(virtualPenTip.position.x, floorY + 0.02f, virtualPenTip.position.z);
+                    
+                    // Spawn cleanly using the native prefab rotation rather than forcing it to snap to the controller's physical roll/pitch!
+                    GameObject newObj = Instantiate(prefab, flatSpawnPos, prefab.transform.rotation);
                     
                     var outline = newObj.GetComponent<Outline>();
                     if (outline != null) outline.enabled = false;
                     
                     // Add a shadow for the new object
-                    ShadowManager sm = FindFirstObjectByType<ShadowManager>();
                     if (sm != null && sm.shadowPrefab != null)
                     {
                         GameObject newShadow = Instantiate(sm.shadowPrefab);

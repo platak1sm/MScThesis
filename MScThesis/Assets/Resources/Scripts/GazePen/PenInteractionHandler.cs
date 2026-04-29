@@ -39,8 +39,11 @@ public class PenInteractionHandler
             
             if (newState == HybridPenController.State.IndirectTableObject || newState == HybridPenController.State.IndirectTableShadow)
             {
+                // Capture the exact Y-Axis yaw rotation the moment the user clicks the trigger!
+                pen.startPenRotationY = pen.virtualPenTip.eulerAngles.y;
+                pen.startObjRotationY = pen.activeObject.eulerAngles.y;
+
                 pen.TogglePenScreen(true);
-                pen.UpdateMinimapCamera();
             }
         }
         else

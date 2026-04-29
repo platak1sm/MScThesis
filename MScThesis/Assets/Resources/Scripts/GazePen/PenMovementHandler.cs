@@ -36,7 +36,17 @@ public class PenMovementHandler
     {
         if (pen.activeObject == null) return;
         Vector3 rawDelta = pen.virtualPenTip.position - pen.startPenPos;
-        Vector3 scaledDelta = rawDelta * pen.moveSensitivity; 
+        
+        float scale = pen.moveSensitivity;
+        if (pen.mappingType == HybridPenController.IndirectMappingType.VisualAngleGain) 
+        {
+            scale *= pen.GetVisualGain();
+        }
+        
+        // Apply the custom table multiplier for shadows
+        scale *= pen.tableIndirectGainMultiplier;
+        
+        Vector3 scaledDelta = rawDelta * scale; 
         Vector3 flatDelta = new Vector3(scaledDelta.x, 0, scaledDelta.z);
         pen.activeObject.position = pen.startObjPos + flatDelta;
     }
@@ -59,6 +69,9 @@ public class PenMovementHandler
         {
             scale *= pen.GetVisualGain();
         }
+        
+        // Boost specifically for table indirect interactions natively without affecting mid-air handling!
+        scale *= pen.tableIndirectGainMultiplier;
         
         Vector3 scaledDelta = delta * scale;
 
@@ -104,7 +117,19 @@ public class PenMovementHandler
             
             pen.activeObject.position = pen.startObjPos + planeMove;
         }
-
+        
+        // 2D Rotation Mapping: Calculate wrist twist exclusively on the Y vector mathematically!
+        float deltaTwist = Mathf.DeltaAngle(pen.startPenRotationY, pen.virtualPenTip.eulerAngles.y);
+        
+        // Amplify the rotation cleanly so small wrist turns result in massive rotations natively in world space
+        float amplifiedTwist = deltaTwist * pen.indirectRotationMultiplier;
+        
+        // Apply perfectly horizontal spins to the object dynamically without tipping it forward!
+        pen.activeObject.eulerAngles = new Vector3(
+            pen.activeObject.eulerAngles.x,
+            pen.startObjRotationY + amplifiedTwist,
+            pen.activeObject.eulerAngles.z
+        );
         pen.UpdateMinimapCamera();
     }
 }

@@ -34,15 +34,31 @@ public class AxesFeedbackManager : MonoBehaviour
         arrow.name = name;
         Destroy(arrow.GetComponent<Collider>());
         
-        arrow.transform.localScale = new Vector3(0.005f, 0.05f, 0.005f);
+        // Make the stalks extremely thin (2mm)
+        arrow.transform.localScale = new Vector3(0.002f, 0.05f, 0.002f);
         arrow.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
         arrow.transform.localPosition = direction * 0.05f;
 
         Renderer r = arrow.GetComponent<Renderer>();
         r.material = new Material(Shader.Find("Unlit/Color"));
         r.material.color = color;
-
         r.material.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+
+        // Spawn a spherical arrowhead rigidly attached to the tip of the cylinder tracking line
+        GameObject tip = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        tip.name = name + "_Tip";
+        Destroy(tip.GetComponent<Collider>());
+        
+        tip.transform.SetParent(arrow.transform, false);
+        // Cylinder is 2 units tall natively, pivot at center. 1.0 is the exact top edge!
+        tip.transform.localPosition = new Vector3(0, 1.0f, 0); 
+        // Scale the sphere to be visually larger than the stalk, e.g. exactly 6mm diameter world scale
+        tip.transform.localScale = new Vector3(3.0f, 0.12f, 3.0f); 
+        
+        Renderer tipR = tip.GetComponent<Renderer>();
+        tipR.material = new Material(Shader.Find("Unlit/Color"));
+        tipR.material.color = color;
+        tipR.material.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
 
         GameObject holder = new GameObject(name + "_Holder");
         arrow.transform.SetParent(holder.transform, false);

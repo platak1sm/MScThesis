@@ -15,6 +15,10 @@ public class GazeRayVisualizer : MonoBehaviour
     {
         line = GetComponent<LineRenderer>();
         line.positionCount = 2;
+        
+        // Make the line extremely thin natively
+        line.startWidth = 0.002f;
+        line.endWidth = 0.002f;
 
         if (gazeProvider == null) gazeProvider = FindFirstObjectByType<GazeProvider>();
         if (eyeCamera == null) eyeCamera = Camera.main;
@@ -24,7 +28,9 @@ public class GazeRayVisualizer : MonoBehaviour
     {
         if (gazeProvider == null || eyeCamera == null) return;
 
-        line.SetPosition(0, eyeCamera.transform.position);
+        // Offset the origin exactly 10cm beneath the headset to simulate cinematic chest projection
+        Vector3 originPos = eyeCamera.transform.position + new Vector3(0, -0.1f, 0);
+        line.SetPosition(0, originPos);
 
         if (gazeProvider.DidHit && gazeProvider.Hit.collider != null)
         {
@@ -32,7 +38,7 @@ public class GazeRayVisualizer : MonoBehaviour
         }
         else
         {
-            line.SetPosition(1, eyeCamera.transform.position + gazeProvider.GazeDirection * defaultRayLength);
+            line.SetPosition(1, originPos + gazeProvider.GazeDirection * defaultRayLength);
         }
     }
 }

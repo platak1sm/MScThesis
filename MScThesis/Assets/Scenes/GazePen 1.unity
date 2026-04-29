@@ -2257,7 +2257,7 @@ RectTransform:
   m_GameObject: {fileID: 221599482}
   m_LocalRotation: {x: 0.38268343, y: 0, z: 0, w: 0.92387956}
   m_LocalPosition: {x: 0, y: 0, z: 0.05}
-  m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
+  m_LocalScale: {x: 0.14, y: 0.14, z: 0.14}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1826519281}
@@ -4890,6 +4890,7 @@ GameObject:
   - component: {fileID: 514547688}
   - component: {fileID: 514547689}
   - component: {fileID: 514547690}
+  - component: {fileID: 514547691}
   m_Layer: 0
   m_Name: PenTip
   m_TagString: Untagged
@@ -5062,7 +5063,7 @@ MonoBehaviour:
   penScreen: {fileID: 221599482}
   minimapCamera: {fileID: 388159071}
   cameraHeight: 1.5
-  cameraZoom: 1.21
+  cameraZoom: 1.04
   minimapAnimationSpeed: 5
   minimapMinimizedScale: 0.3
   initialScreenScale: {x: 0, y: 0, z: 0}
@@ -5078,6 +5079,10 @@ MonoBehaviour:
   startObjPos: {x: 0, y: 0, z: 0}
   grabOffset: {x: 0, y: 0, z: 0}
   grabRotationOffset: {x: 0, y: 0, z: 0, w: 0}
+  indirectRotationMultiplier: 2
+  tableIndirectGainMultiplier: 1.5
+  startPenRotationY: 0
+  startObjRotationY: 0
   lastOutlinedObj: {fileID: 0}
   lastOutlinedShadow: {fileID: 0}
 --- !u!114 &514547690
@@ -5093,6 +5098,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   penController: {fileID: 514547689}
+--- !u!114 &514547691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 514547682}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49f9d8c318cec4904bf1652c47e7287f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  baseSize: 0.06
+  maxHoverDistance: 1
 --- !u!1 &527914563
 GameObject:
   m_ObjectHideFlags: 0
@@ -5104,6 +5123,7 @@ GameObject:
   - component: {fileID: 527914567}
   - component: {fileID: 527914566}
   - component: {fileID: 527914565}
+  - component: {fileID: 527914568}
   m_Layer: 0
   m_Name: Table
   m_TagString: Table
@@ -5179,6 +5199,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 410103750}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &527914568
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 527914563}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a0dcc67bf1ea4a1facb7d4b33c9f3e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gridDensityMultiplier: 100
+  gridLineColor: {r: 0, g: 0, b: 0, a: 0.45}
 --- !u!1 &531521179
 GameObject:
   m_ObjectHideFlags: 0
@@ -11243,8 +11277,8 @@ Transform:
   m_GameObject: {fileID: 1364804123}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.23533607, y: 0.03618896, z: -1.6703156}
-  m_LocalScale: {x: 0.62877, y: 0.62877, z: 0.62877}
+  m_LocalPosition: {x: -0.33351, y: 0.036, z: -1.414}
+  m_LocalScale: {x: 0.8121822, y: 0.8121822, z: 0.8121822}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5357885801086615409}
@@ -14358,6 +14392,7 @@ GameObject:
   - component: {fileID: 1826519284}
   - component: {fileID: 1826519283}
   - component: {fileID: 1826519282}
+  - component: {fileID: 1826519285}
   m_Layer: 0
   m_Name: Quad
   m_TagString: Untagged
@@ -14459,6 +14494,20 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1826519280}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1826519285
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1826519280}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a0dcc67bf1ea4a1facb7d4b33c9f3e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gridDensityMultiplier: 40
+  gridLineColor: {r: 0, g: 0, b: 0, a: 0.3529412}
 --- !u!1 &1829103776
 GameObject:
   m_ObjectHideFlags: 0
@@ -26971,7 +27020,7 @@ Transform:
   m_GameObject: {fileID: 8317858403219038922}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0.7071068, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: 0.27465588, y: -0.194193, z: 0.032106966}
+  m_LocalPosition: {x: -0.26, y: 0.0045, z: 0.032106966}
   m_LocalScale: {x: 0.023033835, y: 0.023033839, z: 0.023033828}
   m_ConstrainProportionsScale: 1
   m_Children: []
